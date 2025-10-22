@@ -1,0 +1,328 @@
+#!/bin/bash
+
+# Pre-commit hook for mandatory CHANGELOG.md and CLAUDE.md updates
+# This hook ensures documentation is kept in sync with code changes
+
+set -e
+
+#──────────────────────────────────────────────────────────────────────────────
+# CONFIGURATION
+#──────────────────────────────────────────────────────────────────────────────
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Settings
+ENABLE_CLAUDE=$(git config --get hooks.enableClaude || echo "false")
+CLAUDE_TIMEOUT=120
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROMPT_TEMPLATE="$HOOKS_DIR/hooks-prompt-template.txt"
+
+# Files that don't require changelog updates
+EXCLUDED_PATTERNS=('.idea/' '*.iml' '.gitignore' '.gitattributes' '*.md' 'CHANGELOG.md')
+
+# Files that indicate architectural/structural changes
+STRUCTURAL_PATTERNS=('build.gradle' 'pom.xml' 'settings.gradle' 'gradle.properties' 'AndroidManifest.xml' 'build.xml' 'package.json')
+
+#──────────────────────────────────────────────────────────────────────────────
+# UTILITY FUNCTIONS
+#──────────────────────────────────────────────────────────────────────────────
+
+print_header() {
+    echo -e "${BLUE}🔍 Running pre-commit documentation check...${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}$1${NC}"
+}
+
+#──────────────────────────────────────────────────────────────────────────────
+# FILE ANALYSIS FUNCTIONS
+#──────────────────────────────────────────────────────────────────────────────
+
+get_staged_files() {
+    git diff --cached --name-only --diff-filter=ACM
+}
+
+is_excluded() {
+    local file=$1
+    for pattern in "${EXCLUDED_PATTERNS[@]}"; do
+        if [[ "$file" == $pattern ]] || [[ "$file" == *"$pattern"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+is_structural() {
+    local file=$1
+    for pattern in "${STRUCTURAL_PATTERNS[@]}"; do
+        if [[ "$file" == *"$pattern"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+has_substantive_changes() {
+    local staged_files=$1
+    while IFS= read -r file; do
+        if ! is_excluded "$file"; then
+            return 0
+        fi
+    done <<< "$staged_files"
+    return 1
+}
+
+has_structural_changes() {
+    local staged_files=$1
+    while IFS= read -r file; do
+        if ! is_excluded "$file" && is_structural "$file"; then
+            return 0
+        fi
+    done <<< "$staged_files"
+    return 1
+}
+
+is_file_staged() {
+    local filename=$1
+    local staged_files=$2
+    echo "$staged_files" | grep -q "^${filename}$"
+}
+
+#──────────────────────────────────────────────────────────────────────────────
+# CLAUDE CODE INTEGRATION
+#──────────────────────────────────────────────────────────────────────────────
+
+check_claude_available() {
+    command -v claude &> /dev/null
+}
+
+create_prompt_from_template() {
+    local staged_files=$1
+    local prompt_file=".git/hooks-prompt-temp.txt"
+
+    if [ ! -f "$PROMPT_TEMPLATE" ]; then
+        print_error "Prompt template not found at: $PROMPT_TEMPLATE"
+        return 1
+    fi
+
+    # Copy template
+    cp "$PROMPT_TEMPLATE" "$prompt_file"
+
+    # Get diff stat
+    local diff_stat=$(git diff --cached --stat)
+
+    # Create temp files for replacements
+    echo "$staged_files" > ".git/staged-files-temp.txt"
+    echo "$diff_stat" > ".git/diff-stat-temp.txt"
+
+    # Replace placeholders
+    sed -e '/{{STAGED_FILES}}/r .git/staged-files-temp.txt' -e '/{{STAGED_FILES}}/d' "$prompt_file" > "$prompt_file.1"
+    sed -e '/{{DIFF_STAT}}/r .git/diff-stat-temp.txt' -e '/{{DIFF_STAT}}/d' "$prompt_file.1" > "$prompt_file"
+
+    # Cleanup temp files
+    rm -f "$prompt_file.1" ".git/staged-files-temp.txt" ".git/diff-stat-temp.txt"
+
+    echo "$prompt_file"
+}
+
+run_claude_code() {
+    local prompt_file=$1
+
+    print_info "Running: claude < $prompt_file"
+    print_warning "This may take up to ${CLAUDE_TIMEOUT} seconds..."
+
+    timeout ${CLAUDE_TIMEOUT}s claude < "$prompt_file" 2>&1
+}
+
+check_file_modified() {
+    local filename=$1
+
+    if [ ! -f "$filename" ]; then
+        return 1
+    fi
+
+    if git diff --quiet "$filename" 2>/dev/null; then
+        return 1
+    fi
+
+    return 0
+}
+
+stage_updated_files() {
+    local structural_changes=$1
+    local updated=false
+
+    if check_file_modified "CHANGELOG.md"; then
+        git add CHANGELOG.md
+        print_success "CHANGELOG.md updated and staged"
+        updated=true
+    fi
+
+    if [ "$structural_changes" = true ] && check_file_modified "CLAUDE.md"; then
+        git add CLAUDE.md
+        print_success "CLAUDE.md updated and staged"
+        updated=true
+    fi
+
+    [ "$updated" = true ]
+}
+
+verify_changelog_staged() {
+    local staged_files=$(get_staged_files)
+    echo "$staged_files" | grep -q "^CHANGELOG.md$"
+}
+
+invoke_claude_code() {
+    local staged_files=$1
+    local structural_changes=$2
+
+    echo -e "${YELLOW}🤖 Attempting to invoke Claude Code for automatic documentation update...${NC}"
+
+    if ! check_claude_available; then
+        print_warning "Claude Code not found in PATH"
+        return 1
+    fi
+
+    local prompt_file=$(create_prompt_from_template "$staged_files")
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+
+    if run_claude_code "$prompt_file"; then
+        stage_updated_files "$structural_changes"
+        rm -f "$prompt_file"
+
+        if verify_changelog_staged; then
+            return 0
+        else
+            print_warning "Claude Code ran but CHANGELOG.md was not updated"
+            return 1
+        fi
+    else
+        print_error "Claude Code execution failed or timed out"
+        rm -f "$prompt_file"
+        return 1
+    fi
+}
+
+#──────────────────────────────────────────────────────────────────────────────
+# ERROR REPORTING
+#──────────────────────────────────────────────────────────────────────────────
+
+print_manual_update_instructions() {
+    local needs_changelog=$1
+    local needs_claude_md=$2
+    local staged_files=$3
+
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${RED}✗ COMMIT BLOCKED: Documentation update required${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    if [ "$needs_changelog" = true ]; then
+        echo -e "${YELLOW}📝 CHANGELOG.md must be updated:${NC}"
+        echo "   - Add entry under 'Unreleased' section"
+        echo "   - Maximum 3 sentences"
+        echo "   - Use category: Added, Changed, Deprecated, Removed, Fixed, Security"
+        echo "   - Then stage it: git add CHANGELOG.md"
+        echo ""
+    fi
+
+    if [ "$needs_claude_md" = true ]; then
+        echo -e "${YELLOW}📝 CLAUDE.md must be updated:${NC}"
+        echo "   - Detected structural/architectural changes in:"
+        while IFS= read -r file; do
+            if is_structural "$file"; then
+                echo "     * $file"
+            fi
+        done <<< "$staged_files"
+        echo "   - Update relevant sections in CLAUDE.md"
+        echo "   - Then stage it: git add CLAUDE.md"
+        echo ""
+    fi
+
+    echo -e "${BLUE}💡 Tips:${NC}"
+    echo "   - Enable auto-update: git config --local hooks.enableClaude true"
+    echo "   - Bypass this check (emergency only): git commit --no-verify"
+    echo ""
+}
+
+#──────────────────────────────────────────────────────────────────────────────
+# MAIN VALIDATION LOGIC
+#──────────────────────────────────────────────────────────────────────────────
+
+main() {
+    print_header
+
+    local staged_files=$(get_staged_files)
+
+    # No files staged
+    if [ -z "$staged_files" ]; then
+        print_success "No files staged, skipping checks"
+        exit 0
+    fi
+
+    # Only excluded files changed
+    if ! has_substantive_changes "$staged_files"; then
+        print_success "Only configuration/documentation files changed, skipping documentation update requirement"
+        exit 0
+    fi
+
+    # Determine what updates are needed
+    local needs_changelog=false
+    local needs_claude_md=false
+    local structural_changes=false
+
+    if has_structural_changes "$staged_files"; then
+        structural_changes=true
+    fi
+
+    if ! is_file_staged "CHANGELOG.md" "$staged_files"; then
+        needs_changelog=true
+    fi
+
+    if [ "$structural_changes" = true ] && ! is_file_staged "CLAUDE.md" "$staged_files"; then
+        needs_claude_md=true
+    fi
+
+    # All requirements met
+    if [ "$needs_changelog" = false ] && [ "$needs_claude_md" = false ]; then
+        print_success "All documentation checks passed"
+        exit 0
+    fi
+
+    # Try auto-update with Claude Code if enabled
+    if [ "$ENABLE_CLAUDE" = "true" ]; then
+        if invoke_claude_code "$staged_files" "$structural_changes"; then
+            print_success "Documentation automatically updated by Claude Code"
+            exit 0
+        else
+            print_warning "Falling back to manual update requirement"
+        fi
+    fi
+
+    # Require manual update
+    print_manual_update_instructions "$needs_changelog" "$needs_claude_md" "$staged_files"
+    exit 1
+}
+
+# Run main function
+main

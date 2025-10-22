@@ -1,0 +1,24 @@
+Please review the currently staged git changes and update the project documentation:
+
+1. **Update CHANGELOG.md**:
+   - Add a concise entry (maximum 3 sentences) under the "Unreleased" section
+   - Follow Keep a Changelog format (https://keepachangelog.com/)
+   - Use appropriate category: Added, Changed, Deprecated, Removed, Fixed, or Security
+   - Describe WHAT changed and WHY, with relevant file references if helpful
+
+2. **Update CLAUDE.md** (only if needed):
+   - If the staged changes include build configuration, architectural modifications, or structural changes
+   - Update relevant sections to reflect the new architecture/structure
+   - Keep it concise and focused on high-level understanding
+
+After making updates, stage the files with:
+- git add CHANGELOG.md
+- git add CLAUDE.md (if updated)
+
+---
+
+## Staged files to review:
+{{STAGED_FILES}}
+
+## Changes summary:
+{{DIFF_STAT}}
