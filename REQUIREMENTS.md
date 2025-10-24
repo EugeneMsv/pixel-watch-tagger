@@ -28,7 +28,7 @@ CREATE TABLE button (
     label TEXT NOT NULL,
     emoji TEXT NOT NULL,
     color TEXT NOT NULL,  -- Hex color code (e.g., "#FF5722")
-    position INTEGER NOT NULL,  -- 0-2 for inner circle, 3-8 for outer circle
+    display_order INTEGER NOT NULL,  -- Order in which buttons are displayed (0-8)
     created_at INTEGER NOT NULL,  -- Unix timestamp
     last_used_at INTEGER  -- Unix timestamp of last event
 );
@@ -39,7 +39,7 @@ CREATE TABLE button (
 - `label`: User-defined text label (e.g., "Coffee", "Medicine")
 - `emoji`: Selected emoji character for visual identification
 - `color`: Hex color code for button appearance
-- `position`: Button position (0-2 inner circle, 3-8 outer circle)
+- `display_order`: Order in which buttons appear on circle (0-8), used for consistent positioning
 - `created_at`: Timestamp when button was created
 - `last_used_at`: Timestamp of most recent event (updated on each tap)
 
@@ -51,12 +51,10 @@ Stores individual timestamp records for button presses.
 CREATE TABLE event (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     button_id INTEGER NOT NULL,
-    timestamp INTEGER NOT NULL,  -- Unix timestamp
+    timestamp LONG NOT NULL,  -- Unix timestamp
     FOREIGN KEY (button_id) REFERENCES button(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_event_button_id ON event(button_id);
-CREATE INDEX idx_event_timestamp ON event(timestamp);
 CREATE INDEX idx_event_button_timestamp ON event(button_id, timestamp);
 ```
 
@@ -81,7 +79,7 @@ data class Button(
     val label: String,
     val emoji: String,
     val color: String,
-    val position: Int,
+    val displayOrder: Int,
     val createdAt: Long,
     val lastUsedAt: Long?
 )
@@ -125,121 +123,259 @@ data class Event(
 
 ## 3. User Interface Design
 
-### 3.1 Main Interface - Circular Button Layout
+### 3.1 Main Interface - Dynamic Circular Button Layout
 
 **Layout Overview:**
 
+The interface uses a **single adaptive circle** that adjusts based on the number of buttons. The watch screen is optimized for circular displays (Google Pixel Watch).
+
 ```
 ┌─────────────────────┐
-│         ⚙️          │  ← Settings icon (top-right corner)
 │                     │
-│        ○            │  ← Inner circle: max 3 buttons
-│      ○   ○          │     Positions: 0, 1, 2
-│    ○       ○        │  ← Outer circle: max 6 buttons
-│      ○   ○          │     Positions: 3, 4, 5, 6, 7, 8
+│                     │
+│        ○            │  ← 1-9 buttons arranged on
+│    ○       ○        │     a single circle
+│   ○    ◯    ○       │     Center: Empty or logo
+│    ○       ○        │     Buttons: Evenly spaced
 │        ○            │
 │                     │
-│   Next: Coffee 2h   │  ← Optional: Shows nearest prediction
+│                     │
 └─────────────────────┘
 ```
 
+**Dynamic Sizing:**
+Buttons automatically resize based on button count to maintain optimal usability:
+- **1 button**: Large (80-100px diameter)
+- **2-3 buttons**: Medium-large (70-85px diameter)
+- **4-6 buttons**: Medium (55-70px diameter)
+- **7-9 buttons**: Compact (45-55px diameter)
+
+**Circle Radius:**
+Calculated dynamically to position buttons optimally:
+- Base radius: ~60-70% of screen width
+- Adjusted based on button size to prevent edge clipping
+- Formula: `radius = (screenWidth / 2) * 0.65 - (buttonDiameter / 2)`
+
 **Button Specifications:**
-- **Equal size**: All buttons same diameter regardless of circle
 - **Shape**: Circular
 - **Appearance per button**:
   - Background: User-selected color
-  - Icon: User-selected emoji (centered, large)
-  - Overlay: Small countdown timer text showing time until next predicted event
+  - Icon: User-selected emoji (centered, large, scales with button)
+  - Overlay (View Mode): Small countdown timer text showing time until next predicted event
     - Example: "2h 15m"
-- **Spacing**: Evenly distributed on their respective circles
-- **Visual feedback on tap**:
-  - Pulse animation
-  - Haptic vibration feedback
-  - Brief color flash
-
-**Circle Dimensions:**
-- Inner circle radius: ~30% of screen width
-- Outer circle radius: ~65% of screen width
-- Button diameter: ~50-60px
+    - Position: Bottom of button or below emoji
+    - Font size: Scales with button size
+- **Spacing**: Evenly distributed around the circle
+- **Visual feedback**:
+  - **View Mode - Single tap**: Pulse animation + haptic vibration
+  - **View Mode - Long press**: Gentle vibration, opens stats menu
+  - **Edit Mode - Single tap**: Highlight + open settings menu
 
 **Position Calculation:**
-- For position `N` in circle with `M` total positions:
-  - Angle = `(N × 360° / M) - 90°`
-  - X coordinate = `centerX + radius × cos(angle)`
-  - Y coordinate = `centerY + radius × sin(angle)`
+For button at index `i` with total `n` buttons:
+```kotlin
+val anglePerButton = 360f / n
+val angle = (i * anglePerButton - 90f).toRadians()  // Start at top (12 o'clock)
+val x = centerX + radius * cos(angle)
+val y = centerY + radius * sin(angle)
+```
+
+**Button Order:**
+- Buttons positioned clockwise starting from top (12 o'clock)
+- Order determined by `display_order` field in database (0-8)
+- First button (display_order=0) at top, subsequent buttons clockwise
 
 **Maximum Capacity:**
-- Inner circle: 3 buttons (positions 0, 1, 2)
-- Outer circle: 6 buttons (positions 3, 4, 5, 6, 7, 8)
 - **Total maximum: 9 buttons**
-
-**Interactions:**
-- **Tap button**: Record timestamp event for that button
-- **Tap ⚙️ icon**: Navigate to Settings mode
+- No inner/outer circle distinction
+- All buttons on single circle with adaptive sizing
 
 ---
 
-### 3.2 Settings Mode
+### 3.2 Application Modes: View and Edit
 
-**Navigation:**
-- **Enter**: Tap ⚙️ icon on main screen
-- **Exit**: Hardware back button or back gesture
+The application operates in two distinct modes, optimized for watch interaction:
 
-#### 3.2.1 Button Management Screen
+#### 3.2.1 View Mode (Default)
+
+**Purpose**: Quick event recording and data viewing
+
+**Visual Appearance:**
+- Only user-created buttons visible on the circle
+- Clean, minimal interface
+- Countdown timers visible on each button (if predictions available)
+- No additional UI elements or icons
+
+**Interactions:**
+
+1. **Single Tap on Button**
+   - Records new event with current timestamp
+   - Visual feedback: Pulse animation
+   - Haptic feedback: Short vibration
+   - UI update: Countdown timer refreshes (if affected)
+   - No navigation away from main screen
+
+2. **Long Press on Button**
+   - Opens **Stats Menu** for that specific button
+   - Haptic feedback: Longer vibration pattern
+   - Navigation: Transitions to Stats screen
+   - Shows:
+     - Button-specific statistics
+     - Scatter plot chart
+     - Detected clusters
+     - Next predicted event details
+     - Export CSV option
+
+3. **Swipe from Edge Gesture**
+   - **Swipe from right edge** → Toggle to Edit Mode
+   - Smooth transition animation
+   - Mode indicator briefly appears
+
+**First-Time Experience:**
+- If no buttons exist: Show centered "+" button only
+- Tap "+" → Enter Edit Mode → Add first button
+
+---
+
+#### 3.2.2 Edit Mode
+
+**Purpose**: Button management (add, edit, delete, reorder)
+
+**Visual Appearance:**
+- All existing buttons visible (same positions as View Mode)
+- Additional **"+" button** appears on the circle
+  - Positioned at the next available display_order slot
+  - Visually distinct (e.g., dashed border, lighter color)
+  - Icon: Plus symbol (➕)
+- Optional: Subtle visual indicator showing Edit Mode is active (e.g., slight glow around buttons)
+
+**Interactions:**
+
+1. **Single Tap on Existing Button**
+   - Opens **Button Settings Menu** for that button
+   - Navigation: Transitions to Button Settings screen
+   - Options available:
+     - **Edit** section:
+       - Rename label
+       - Change emoji
+       - Change color
+     - **Actions** section:
+       - Delete button (with confirmation dialog)
+
+2. **Single Tap on "+" Button**
+   - Opens **Add New Button** form
+   - Navigation: Transitions to Add Button screen
+   - Form includes:
+     - Label input field
+     - Emoji picker
+     - Color picker
+     - Save/Cancel buttons
+   - On save: New button added at next display_order
+
+3. **Swipe from Edge Gesture**
+   - **Swipe from right edge** → Return to View Mode
+   - Smooth transition animation
+   - Mode indicator briefly disappears
+
+**Maximum Buttons Handling:**
+- If 9 buttons exist: "+" button disabled or hidden
+- Attempting to add shows error: "Maximum 9 buttons reached. Delete a button first."
+
+**Button Reordering (Optional for V1):**
+- Long-press and drag to reorder (future enhancement)
+- For V1: Buttons added in chronological order (by display_order)
+
+---
+
+### 3.3 Button Settings Menu (Edit Mode)
+
+**Accessed via**: Edit Mode → Tap existing button
 
 **Layout:**
 
 ```
 ┌─────────────────────┐
-│  ← Button Manager   │
+│  ← Button Settings  │
 ├─────────────────────┤
-│  ☕ Coffee      [✏️] │  ← Tap row or ✏️ to edit
-│  💊 Medicine    [✏️] │
-│  🏃 Exercise    [✏️] │
-│  🍕 Meal        [✏️] │
 │                     │
-│  [+ Add Button]     │  ← Shows if < 9 buttons
+│  ☕ Coffee           │  ← Current button preview
+│  [Color indicator]  │
 │                     │
-│  [Statistics]       │  ← Navigate to stats screen
+│  ━━━ Edit ━━━━━━━━  │
+│  [Rename Label]     │
+│  [Change Emoji]     │
+│  [Change Color]     │
+│                     │
+│  ━━━ Actions ━━━━━  │
+│  [Delete Button]    │  ← Red/destructive style
+│                     │
+│  [← Back]           │
 └─────────────────────┘
 ```
 
-**Button List:**
-- Shows all configured buttons
-- Each row displays: emoji, label, edit icon
-- Tap row or edit icon → Open edit form
-- Scrollable list if many buttons
+**Form Options:**
 
-**Add Button Behavior:**
-- If < 9 buttons: Button enabled, opens add form
-- If = 9 buttons: Button disabled OR shows error dialog
-  - Error message: "Maximum 9 buttons reached. Please delete an existing button first."
+1. **Rename Label**
+   - Opens text input dialog
+   - Current label pre-filled
+   - Max 20 characters
+   - Validation: Non-empty
+   - Save/Cancel buttons
+
+2. **Change Emoji**
+   - Opens system emoji picker
+   - Current emoji pre-selected
+   - Single emoji selection
+   - Immediately updates on selection
+
+3. **Change Color**
+   - Opens color picker dialog
+   - Predefined palette: 12-16 colors
+   - Current color highlighted
+   - Hex color stored (e.g., "#FF5722")
+
+4. **Delete Button**
+   - Red destructive button
+   - Shows confirmation dialog:
+     ```
+     Delete "Coffee"?
+     This will also delete all 87 associated events.
+     This action cannot be undone.
+
+     [Cancel] [Delete]
+     ```
+   - On confirm:
+     - Delete button record
+     - Cascade delete all events (foreign key)
+     - Recalculate display_order for remaining buttons
+     - Return to Edit Mode
+
+**Navigation:**
+- Back button: Return to Edit Mode without changes
+- After save: Return to Edit Mode with updates applied
 
 ---
 
-#### 3.2.2 Add/Edit Button Form
+### 3.4 Add New Button Form (Edit Mode)
+
+**Accessed via**: Edit Mode → Tap "+" button
 
 **Layout:**
 
 ```
 ┌─────────────────────┐
-│  ← Edit Button      │
+│  ← Add Button       │
 ├─────────────────────┤
 │  Label              │
-│  [Coffee_________]  │  ← Text input field
+│  [____________]     │  ← Text input field
 │                     │
 │  Emoji              │
-│  [☕  Select...]    │  ← Opens emoji picker
+│  [⭐  Select...]    │  ← Opens emoji picker
 │                     │
 │  Color              │
-│  [🟤  Select...]    │  ← Opens color picker
+│  [●  Select...]     │  ← Opens color picker
 │                     │
-│  Circle Preference  │
-│  ⚪ Inner (3 max)   │  ← Radio buttons
-│  ⚫ Outer (6 max)   │     (auto-assign position)
-│                     │
-│  [Delete Button]    │  ← Only shown when editing
-│  [Save]             │
+│  [Save]  [Cancel]   │
 └─────────────────────┘
 ```
 
@@ -249,58 +385,52 @@ data class Event(
    - Text input, max 20 characters
    - Required field
    - Validation: Non-empty
+   - Placeholder: "Button name"
 
 2. **Emoji**
-   - Opens system emoji picker
-   - Default: ⭐ (if adding new button)
+   - Opens system emoji picker dialog
+   - Default: ⭐ (star)
    - Single emoji selection
+   - Required field
 
 3. **Color**
-   - Color picker dialog
-   - Predefined palette: 12-16 common colors
+   - Opens color picker dialog
+   - Predefined palette: 12-16 common colors (see Appendix A)
+   - Default: Random color or first available
    - Hex color stored (e.g., "#FF5722")
 
-4. **Circle Preference**
-   - Radio button selection: Inner or Outer
-   - System auto-assigns first available position in selected circle
-   - If selected circle is full:
-     - Show warning: "Inner/Outer circle full. Choose other circle."
-     - Disable Save until valid selection
+**Save Behavior:**
+- Validation: Ensure label is non-empty
+- Assign `display_order`: Next available index (0-8)
+- If < 9 buttons: Save successfully
+- If = 9 buttons: Should not reach this state (+ button hidden)
+- On save:
+  - Create new Button record in database
+  - Return to Edit Mode
+  - New button appears on circle
 
-5. **Delete Button** (Edit mode only)
-   - Red destructive button
-   - Shows confirmation dialog before deletion
-   - Confirmation message:
-     ```
-     Delete "Coffee"?
-     This will also delete all X associated events.
-     [Cancel] [Delete]
-     ```
-
-**Position Auto-Assignment Logic:**
-```
-IF user selects "Inner":
-    Find first available position in [0, 1, 2]
-    IF all full:
-        Show error, disable Save
-ELSE IF user selects "Outer":
-    Find first available position in [3, 4, 5, 6, 7, 8]
-    IF all full:
-        Show error, disable Save
-```
+**Cancel Behavior:**
+- Discard all changes
+- Return to Edit Mode
+- No database modifications
 
 ---
 
-#### 3.2.3 Statistics Chart Screen
+### 3.5 Statistics Chart Screen (View Mode - Long Press)
+
+**Accessed via**: View Mode → Long press on any button
+
+**Purpose**: View detailed statistics, predictions, and event history for a specific button
 
 **Layout:**
 
 ```
 ┌─────────────────────┐
-│  ← Statistics       │
+│  ← ☕ Coffee Stats  │  ← Button name in title
 ├─────────────────────┤
-│  Button             │
-│  [☕ Coffee     ▼]  │  ← Dropdown selector
+│                     │
+│  Next: 2h 15m       │  ← Next predicted event
+│  Confidence: High   │
 │                     │
 │  Time Range         │
 │  [7] [14] [30]      │  ← Chip buttons (30 selected)
@@ -322,21 +452,35 @@ ELSE IF user selects "Outer":
 └─────────────────────┘
 ```
 
+**Context:**
+- Automatically loaded for the specific button that was long-pressed
+- No need for button dropdown selector (single-button focus)
+- Title shows button emoji and label
+
+**Prediction Section:**
+- **Next predicted event**: Time until next predicted occurrence
+  - Format: "2h 15m" or "Tomorrow 8:15 AM"
+- **Confidence level**: HIGH, MEDIUM, LOW
+  - Color-coded (Green, Yellow, Gray)
+- Only shown if enough data exists (7+ events)
+
 **Controls:**
 
-1. **Button Selector**
-   - Dropdown showing all configured buttons
-   - Selected button's data is displayed
-
-2. **Time Range Selector**
+1. **Time Range Selector**
    - Three chip buttons: 7, 14, 30 days
    - Currently selected chip highlighted
-   - Changes chart data range
+   - Default: 30 days
+   - Changes chart data range and cluster calculations
 
-3. **Export CSV Button**
+2. **Export CSV Button**
    - Exports current button's events to CSV
-   - Format: `timestamp,button_label,button_emoji`
-   - Saved to paired phone or watch storage
+   - Format: `timestamp,unix_timestamp,button_label,button_emoji`
+   - Saved to watch storage or shared to phone
+   - Shows success toast: "Exported 87 events"
+
+**Navigation:**
+- Back button (← or hardware back): Return to View Mode
+- Stays on this screen until user navigates away
 
 **Chart Specifications:**
 
@@ -577,124 +721,221 @@ Time →
 
 **Steps:**
 
-1. App launches → Main interface displayed (empty)
-2. Message overlay: "Tap ⚙️ to add your first button"
-3. User taps settings icon
-4. Settings screen opens → Button Management
-5. User taps "+ Add Button"
-6. Add button form opens
-7. User fills in label, emoji, color, circle preference
-8. User taps "Save"
-9. Return to main interface → Button now visible on circle
+1. App launches → Main interface displayed (View Mode, empty)
+2. Only a centered **"+" button** is visible
+3. User taps "+" button
+4. App enters **Edit Mode** (or directly opens Add Button form)
+5. Add Button form opens
+6. User fills in:
+   - Label: "Coffee"
+   - Emoji: ☕ (from emoji picker)
+   - Color: Brown (from color palette)
+7. User taps "Save"
+8. App returns to View Mode
+9. First button now visible on the circle at top position (12 o'clock)
 10. User can tap button to record first event
 
-### 5.2 Recording an Event
+**Alternative first launch:**
+- User can swipe from right edge to enter Edit Mode explicitly
+- Then tap "+" button to add first button
+
+---
+
+### 5.2 Recording an Event (View Mode)
 
 **Steps:**
 
-1. User on main interface
+1. User in **View Mode** (default state)
 2. User taps a button (e.g., "Coffee" button)
 3. **Immediate feedback**:
-   - Haptic vibration (short pulse)
-   - Button pulse animation (brief scale up/down)
-   - Optional: Brief success toast "Event recorded"
-4. **Backend processing**:
+   - Haptic vibration (short pulse, ~50ms)
+   - Button pulse animation (brief scale: 1.0 → 1.2 → 1.0)
+   - Optional: Subtle visual flash (button border/glow)
+4. **Backend processing** (asynchronous):
    - Create new Event record with current timestamp
    - Update button's `last_used_at` field
-   - If enough data (>7 events), recalculate predictions
+   - If enough data (≥7 events), recalculate predictions for this button
 5. **UI update**:
-   - Countdown timer updates (if prediction changed)
-6. User can immediately tap again or tap other buttons
+   - Countdown timer updates on button (if prediction changed)
+   - No navigation away from View Mode
+6. User can immediately tap same button again or tap other buttons
 
 **Expected frequency:** ~10 taps/button/day
 
-### 5.3 Viewing Statistics
+**User stays in View Mode** - no screen transitions for quick logging
+
+---
+
+### 5.3 Viewing Statistics (View Mode - Long Press)
 
 **Steps:**
 
-1. User taps ⚙️ icon → Settings mode
-2. Tap "Statistics" option
-3. Statistics screen opens
+1. User in **View Mode**
+2. User **long presses** a button (e.g., "Coffee" button)
+   - Long press duration: ~500-700ms
+   - Haptic feedback: Gentle vibration pattern (different from single tap)
+3. **Statistics screen opens** for that specific button
 4. **Default view**:
-   - First button selected in dropdown
-   - 30-day range selected
-   - Chart renders with all events
+   - Button emoji and label in title: "← ☕ Coffee Stats"
+   - Prediction section shows next event and confidence
+   - 30-day range selected by default
+   - Scatter plot chart renders with all events
+   - Detected clusters listed below chart
 5. **Interactions**:
-   - Change button via dropdown → Chart updates
    - Change time range (7/14/30 days) → Chart re-queries and updates
    - Pinch/zoom on chart → Zoom into time range
    - Tap data point → Show tooltip with exact timestamp
-6. **View clusters**:
-   - Scroll down to cluster legend
+   - Scroll down to view cluster legend
    - Review detected patterns and confidence levels
-7. **Export** (optional):
+6. **Export** (optional):
    - Tap "Export CSV" button
-   - File saved to watch storage or sent to phone
-   - Success message displayed
+   - File saved to watch storage or shared to phone
+   - Success toast: "Exported 87 events to coffee-20250123.csv"
+7. **Navigation back**:
+   - Tap back arrow (←) or hardware back button
+   - Returns to **View Mode**
 
-### 5.4 Managing Buttons
+---
 
-#### 5.4.1 Adding a New Button
+### 5.4 Switching to Edit Mode
 
 **Steps:**
 
-1. Settings → Button Management
-2. Tap "+ Add Button"
-3. Fill out form:
-   - Label: "Meditation"
-   - Emoji: 🧘 (from picker)
-   - Color: Purple (from palette)
-   - Circle: Inner (if space available)
-4. Tap "Save"
-5. **Validation**:
-   - Check if selected circle has space
-   - If full: Show error, prevent save
-   - If valid: Assign position, save to database
-6. Return to button list → New button visible
-7. Navigate to main interface → Button visible on circle
+1. User in **View Mode**
+2. User swipes from **right edge** of screen
+   - Swipe gesture: Short horizontal swipe inward (→ ←)
+   - Visual feedback: Transition animation
+   - Optional: Brief mode indicator badge ("Edit Mode")
+3. App enters **Edit Mode**
+4. **Visual changes**:
+   - All existing buttons remain visible at same positions
+   - Additional **"+" button** appears on circle (next available position)
+   - Subtle visual indicator (e.g., slight glow on buttons, or "Edit" badge)
+5. User can now:
+   - Tap existing button → Edit button settings
+   - Tap "+" button → Add new button
+
+---
+
+### 5.5 Adding a New Button (Edit Mode)
+
+**Steps:**
+
+1. User in **Edit Mode** (via swipe from edge)
+2. User taps **"+" button**
+3. **Add Button form** opens
+4. User fills in form:
+   - **Label**: "Meditation" (max 20 chars)
+   - **Emoji**: 🧘 (opens emoji picker)
+   - **Color**: Purple (opens color picker with 12-16 palette options)
+5. User taps **"Save"**
+6. **Validation**:
+   - Check label is non-empty
+   - If valid: Assign next available `display_order` (0-8)
+   - Create Button record in database
+7. Form closes, returns to **Edit Mode**
+8. New button appears on circle at next position (clockwise from last button)
+9. User can:
+   - Add more buttons (if < 9 total)
+   - Swipe from edge → Return to View Mode
 
 **Edge case - 9 buttons exist:**
+- "+" button is **hidden** or **disabled**
+- User cannot add more buttons until one is deleted
 
-1. User taps "+ Add Button"
-2. Error dialog appears:
-   > "Maximum 9 buttons reached. Please delete an existing button first."
-3. User must delete a button before adding new one
+---
 
-#### 5.4.2 Editing an Existing Button
-
-**Steps:**
-
-1. Settings → Button Management
-2. Tap edit icon ✏️ on desired button
-3. Edit form opens with current values pre-filled
-4. User modifies label, emoji, or color
-5. Tap "Save"
-6. Changes saved to database
-7. UI updates on main interface (button appearance changes)
-8. Events remain unchanged (same button_id)
-
-#### 5.4.3 Deleting a Button
+### 5.6 Editing an Existing Button (Edit Mode)
 
 **Steps:**
 
-1. Settings → Button Management
-2. Tap edit icon ✏️ on desired button
-3. Scroll to "Delete Button" (red button)
-4. Tap "Delete Button"
-5. **Confirmation dialog**:
+1. User in **Edit Mode**
+2. User taps an **existing button** (e.g., "Coffee")
+3. **Button Settings Menu** opens
+4. Menu shows:
+   - Current button preview (emoji, label, color)
+   - **Edit** section:
+     - [Rename Label]
+     - [Change Emoji]
+     - [Change Color]
+   - **Actions** section:
+     - [Delete Button] (red/destructive style)
+5. User selects an option:
+
+   **Option A: Rename Label**
+   - Text input dialog opens
+   - Current label ("Coffee") pre-filled
+   - User changes to "Espresso"
+   - Taps Save → Returns to Button Settings Menu
+
+   **Option B: Change Emoji**
+   - Emoji picker opens
+   - Current emoji (☕) pre-selected
+   - User selects new emoji (🍵)
+   - Immediately returns to Button Settings Menu with new emoji
+
+   **Option C: Change Color**
+   - Color picker opens
+   - Current color highlighted
+   - User selects new color (e.g., Green)
+   - Returns to Button Settings Menu with new color
+
+6. User taps **back arrow (←)** to return to Edit Mode
+7. **UI updates**:
+   - Button on main circle reflects changes
+   - Database updated with new values
+   - Events remain unchanged (same button_id)
+
+---
+
+### 5.7 Deleting a Button (Edit Mode)
+
+**Steps:**
+
+1. User in **Edit Mode**
+2. User taps an **existing button** to open Button Settings Menu
+3. User scrolls to **"Delete Button"** (red button at bottom)
+4. User taps **"Delete Button"**
+5. **Confirmation dialog** appears:
    ```
    Delete "Coffee"?
    This will also delete all 87 associated events.
+   This action cannot be undone.
 
    [Cancel] [Delete]
    ```
-6. User taps "Delete"
+6. User taps **"Delete"**
 7. **Backend processing**:
-   - Delete button record
-   - Cascade delete all events (via foreign key)
-   - Recalculate predictions for remaining buttons
-8. Return to button list → Button removed
-9. Main interface updates → Button removed from circle
+   - Delete Button record from database
+   - Cascade delete all associated Event records (via foreign key)
+   - Recalculate `display_order` for remaining buttons:
+     - If button with display_order=3 deleted, buttons 4-8 shift down to 3-7
+   - Recalculate predictions for remaining buttons (if affected)
+8. Dialog closes, returns to **Edit Mode**
+9. **UI updates**:
+   - Deleted button removed from circle
+   - Remaining buttons reposition to maintain even spacing
+   - Button count decreases (e.g., 9 → 8)
+   - If was at 9 buttons: "+" button now appears/enabled
+
+---
+
+### 5.8 Returning to View Mode (from Edit Mode)
+
+**Steps:**
+
+1. User in **Edit Mode**
+2. User swipes from **right edge** of screen again
+   - Same gesture as entering Edit Mode (toggle behavior)
+   - Alternative: Hardware back button
+3. **Transition animation** plays
+4. App returns to **View Mode**
+5. **Visual changes**:
+   - "+" button disappears
+   - Edit mode indicator disappears
+   - Button interactions return to View Mode behavior:
+     - Single tap = Record event
+     - Long press = View stats
 
 ---
 
@@ -851,16 +1092,22 @@ app/
 │   │   │   │   ├── main/
 │   │   │   │   │   ├── MainScreen.kt
 │   │   │   │   │   ├── CircularButtonLayout.kt
-│   │   │   │   │   └── MainViewModel.kt
-│   │   │   │   ├── settings/
-│   │   │   │   │   ├── ButtonManagementScreen.kt
-│   │   │   │   │   ├── ButtonFormScreen.kt
+│   │   │   │   │   ├── ButtonLayoutCalculator.kt  // NEW: Dynamic layout calculations
+│   │   │   │   │   ├── MainViewModel.kt
+│   │   │   │   │   └── AppMode.kt  // NEW: Enum for View/Edit modes
+│   │   │   │   ├── edit/
+│   │   │   │   │   ├── EditModeScreen.kt  // NEW: Edit mode overlay
+│   │   │   │   │   ├── ButtonSettingsScreen.kt  // Renamed from ButtonFormScreen
+│   │   │   │   │   ├── AddButtonScreen.kt  // NEW: Separate add form
+│   │   │   │   │   └── EditViewModel.kt
+│   │   │   │   ├── stats/
 │   │   │   │   │   ├── StatisticsScreen.kt
-│   │   │   │   │   └── SettingsViewModel.kt
+│   │   │   │   │   └── StatsViewModel.kt
 │   │   │   │   ├── components/
 │   │   │   │   │   ├── ScatterPlotChart.kt
 │   │   │   │   │   ├── EmojiPicker.kt
-│   │   │   │   │   └── ColorPicker.kt
+│   │   │   │   │   ├── ColorPicker.kt
+│   │   │   │   │   └── EdgeSwipeDetector.kt  // NEW: Gesture detection
 │   │   │   ├── workers/
 │   │   │   │   ├── DataCleanupWorker.kt
 │   │   │   │   └── PredictionWorker.kt
@@ -943,13 +1190,31 @@ UI (Compose) → ViewModel → Repository → DAO → Database
 class MainViewModel @Inject constructor(
     private val buttonRepository: ButtonRepository,
     private val eventRepository: EventRepository,
-    private val predictionService: PredictionService
+    private val predictionService: PredictionService,
+    private val layoutCalculator: ButtonLayoutCalculator
 ) : ViewModel() {
 
+    // App mode state (View/Edit)
+    private val _appMode = MutableStateFlow(AppMode.VIEW)
+    val appMode: StateFlow<AppMode> = _appMode.asStateFlow()
+
+    // Button data with dynamic layout
     val buttons: StateFlow<List<Button>> = buttonRepository.getAllButtons()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // Button positions calculated dynamically
+    val buttonPositions: StateFlow<List<ButtonPosition>> = buttons.map { buttonList ->
+        layoutCalculator.calculatePositions(buttonList, screenSize)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     val predictions: StateFlow<Map<Int, Prediction>> = /* ... */
+
+    fun toggleMode() {
+        _appMode.value = when (_appMode.value) {
+            AppMode.VIEW -> AppMode.EDIT
+            AppMode.EDIT -> AppMode.VIEW
+        }
+    }
 
     fun recordEvent(buttonId: Int) {
         viewModelScope.launch {
@@ -963,6 +1228,221 @@ class MainViewModel @Inject constructor(
 
             // Recalculate prediction for this button
             updatePrediction(buttonId)
+        }
+    }
+}
+
+// App mode enum
+enum class AppMode {
+    VIEW,  // Default: single tap = record, long press = stats
+    EDIT   // Single tap = edit button, + button visible
+}
+
+// Button position data class
+data class ButtonPosition(
+    val button: Button,
+    val x: Float,
+    val y: Float,
+    val size: Float  // Diameter in pixels
+)
+```
+
+### 8.4 Dynamic Layout Calculator
+
+**Purpose**: Calculates optimal button sizes and positions for the circular layout based on button count, ensuring buttons fit perfectly inside the screen without intersection.
+
+**Mathematical Approach:**
+
+The layout algorithm calculates button size mathematically to ensure:
+1. All buttons fit inside the circular screen
+2. No buttons intersect/overlap
+3. Maximum use of available space
+4. Buttons touch each other at exactly one point when possible
+
+**Implementation:**
+
+```kotlin
+class ButtonLayoutCalculator @Inject constructor() {
+
+    /**
+     * Calculates button positions and sizes for circular layout
+     * @param buttons List of buttons ordered by display_order
+     * @param screenSize Screen dimensions (width x height)
+     * @return List of ButtonPosition with x, y coordinates and size
+     */
+    fun calculatePositions(
+        buttons: List<Button>,
+        screenSize: Size
+    ): List<ButtonPosition> {
+        if (buttons.isEmpty()) return emptyList()
+
+        val centerX = screenSize.width / 2f
+        val centerY = screenSize.height / 2f
+        val screenRadius = min(screenSize.width, screenSize.height) / 2f
+
+        // Special case: 1 button - fills entire screen
+        if (buttons.size == 1) {
+            return listOf(
+                ButtonPosition(
+                    button = buttons[0],
+                    x = centerX,
+                    y = centerY,
+                    size = screenRadius * 2f * 0.9f  // 90% of screen to leave margin
+                )
+            )
+        }
+
+        // Calculate optimal button size based on geometry
+        val buttonRadius = calculateOptimalButtonRadius(buttons.size, screenRadius)
+        val buttonDiameter = buttonRadius * 2f
+
+        // Calculate circle radius (distance from center to button centers)
+        val layoutRadius = screenRadius - buttonRadius  // Ensures buttons fit inside screen
+
+        // Calculate positions around circle
+        return buttons.mapIndexed { index, button ->
+            val angle = calculateAngle(index, buttons.size)
+            val x = centerX + layoutRadius * cos(angle)
+            val y = centerY + layoutRadius * sin(angle)
+
+            ButtonPosition(
+                button = button,
+                x = x,
+                y = y,
+                size = buttonDiameter
+            )
+        }
+    }
+
+    /**
+     * Calculate optimal button radius based on geometry
+     *
+     * For n buttons arranged on a circle of radius R:
+     * - Buttons are placed at distance R from center
+     * - Each button has radius r
+     * - For buttons to touch at exactly one point, the distance between adjacent button centers equals 2r
+     *
+     * Using geometry:
+     * - Angle between adjacent buttons: θ = 2π/n
+     * - Chord length between adjacent centers: c = 2R·sin(θ/2)
+     * - For buttons to touch: c = 2r
+     * - Therefore: r = R·sin(π/n)
+     *
+     * Since R = screenRadius - r (to fit inside screen):
+     * - r = (screenRadius - r)·sin(π/n)
+     * - r = screenRadius·sin(π/n) - r·sin(π/n)
+     * - r·(1 + sin(π/n)) = screenRadius·sin(π/n)
+     * - r = screenRadius·sin(π/n) / (1 + sin(π/n))
+     */
+    private fun calculateOptimalButtonRadius(count: Int, screenRadius: Float): Float {
+        val angleRad = PI.toFloat() / count
+        val sinAngle = sin(angleRad)
+
+        // Mathematical formula for optimal button radius
+        val optimalRadius = screenRadius * sinAngle / (1f + sinAngle)
+
+        // Apply practical constraints
+        val minRadius = 22.5f  // Minimum 45px diameter for usability
+        val maxRadius = 50f    // Maximum 100px diameter
+
+        return optimalRadius.coerceIn(minRadius, maxRadius)
+    }
+
+    /**
+     * Calculate angle for button at given index
+     * Starts at top (12 o'clock = -90°) and proceeds clockwise
+     */
+    private fun calculateAngle(index: Int, totalCount: Int): Float {
+        val anglePerButton = (2f * PI / totalCount).toFloat()
+        return (index * anglePerButton - PI / 2f).toFloat()  // Start at top (-90°)
+    }
+}
+
+// Button position data class
+data class ButtonPosition(
+    val button: Button,
+    val x: Float,      // Center X coordinate
+    val y: Float,      // Center Y coordinate
+    val size: Float    // Diameter in pixels
+)
+```
+
+**Geometric Properties:**
+
+1. **Single Button (n=1)**:
+   - Takes 90% of screen diameter
+   - Centered on screen
+   - Example: 360px screen → 324px button
+
+2. **Two Buttons (n=2)**:
+   - Formula: r = screenRadius × sin(90°) / (1 + sin(90°))
+   - r = R × 1 / 2 ≈ 0.414R
+   - Each button ≈ 41.4% of screen radius
+   - Positioned at opposite sides (180° apart)
+   - Touch at one point in the middle
+
+3. **Three Buttons (n=3)**:
+   - Formula: r = screenRadius × sin(60°) / (1 + sin(60°))
+   - r = R × 0.866 / 1.866 ≈ 0.464R
+   - Each button ≈ 46.4% of screen radius
+   - Positioned at 120° intervals
+   - Form equilateral triangle, touching at exactly 3 points
+
+4. **Four or More Buttons (n≥4)**:
+   - Similar geometric calculation
+   - Buttons get progressively smaller as count increases
+   - Always tangent to adjacent buttons (touching at one point)
+   - Constrained by minimum usability size (45px diameter)
+
+**Visual Examples:**
+
+```
+n=1: Single large button        n=2: Two buttons           n=3: Three buttons
+┌─────────┐                    ┌─────────┐                ┌─────────┐
+│         │                    │    ●    │                │    ●    │
+│    ●    │  ← Fills screen    │  ●   ●  │  ← Touch      │  ●   ●  │  ← Form
+│         │                    │         │    in center   │    ●    │    triangle
+└─────────┘                    └─────────┘                └─────────┘
+
+n=6: Six buttons               n=9: Nine buttons
+┌─────────┐                    ┌─────────┐
+│  ● ● ●  │                    │ ● ● ● ● │
+│ ●     ● │  ← Evenly         │●       ●│  ← Maximum
+│  ● ● ●  │    spaced          │ ● ● ● ● │    capacity
+└─────────┘                    └─────────┘
+```
+
+**Usage in Compose UI:**
+
+```kotlin
+@Composable
+fun CircularButtonLayout(
+    buttonPositions: List<ButtonPosition>,
+    appMode: AppMode,
+    onButtonClick: (Int) -> Unit,
+    onButtonLongPress: (Int) -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        buttonPositions.forEach { position ->
+            CircleButton(
+                button = position.button,
+                x = position.x,
+                y = position.y,
+                size = position.size,
+                mode = appMode,
+                onClick = { onButtonClick(position.button.id) },
+                onLongPress = { onButtonLongPress(position.button.id) }
+            )
+        }
+
+        // Show + button in Edit Mode if < 9 buttons
+        if (appMode == AppMode.EDIT && buttonPositions.size < 9) {
+            val nextPosition = calculateNextButtonPosition(buttonPositions)
+            AddButton(
+                x = nextPosition.x,
+                y = nextPosition.y,
+                size = nextPosition.size
+            )
         }
     }
 }
