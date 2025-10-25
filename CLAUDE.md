@@ -4,16 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**pixel-watch-tagger** is a Java application designed for Google Pixel Watch. The project is currently in its initial setup phase.
+**pixel-watch-tagger** is a Kotlin application designed for Google Pixel Watch. The app tracks timestamped button presses across configurable categories and uses clustering algorithms to analyze patterns and predict future occurrences.
 
 ## Project Configuration
 
-- **Platform**: Google Pixel Watch (Wear OS)
-- **Language**: Java
-- **Language Level**: Java 17
-- **JDK**: 1.8 (configured)
-- **IDE**: IntelliJ IDEA
-- **Build System**: To be determined (likely Gradle for Android/Wear OS development)
+- **Platform**: Google Pixel Watch (Wear OS 4+)
+- **Language**: Kotlin
+- **Java Version**: Java 21
+- **Min SDK**: 33 (Wear OS 4+)
+- **Target SDK**: 34
+- **IDE**: IntelliJ IDEA or Android Studio
+- **Build System**: Gradle 8.9 with Kotlin DSL
+- **UI Framework**: Jetpack Compose for Wear OS
 
 ## Development Setup
 
@@ -30,12 +32,29 @@ This configures the repository to enforce documentation updates on every commit.
 - Check for Claude Code installation
 - Optionally enable automatic documentation updates via Claude Code
 
-### Environment
+### Environment Requirements
 
-This project is in early initialization. When developing:
-- Wear OS applications typically use Android Studio or IntelliJ IDEA with Android plugin
-- Will require Android SDK and Wear OS SDK setup
-- Standard Android/Wear OS project structure will be needed
+- **Java JDK**: Java 21 or higher
+- **Android SDK**: API level 34 (Android 14)
+- **Wear OS SDK**: Included in Android SDK
+- **IDE**: Android Studio (recommended) or IntelliJ IDEA with Android plugin
+- **Gradle**: 8.9+ (included via wrapper)
+
+### Build Commands
+
+```bash
+# Build the project
+./gradlew build
+
+# Install debug APK to connected watch
+./gradlew installDebug
+
+# Clean build artifacts
+./gradlew clean
+
+# Check for dependency updates
+./gradlew dependencyUpdates
+```
 
 ### Code Quality Tools
 
@@ -45,12 +64,36 @@ The IntelliJ configuration includes:
 
 ## Project Structure
 
-Currently only IntelliJ IDEA configuration files exist. Standard Wear OS structure should include:
-- `app/src/main/java` - Application source code
-- `app/src/main/res` - Resources (layouts, drawables, etc.)
-- `app/src/main/AndroidManifest.xml` - App manifest
-- `build.gradle` - Build configuration
-- Wear OS specific configurations and dependencies
+```
+pixel-watch-tagger/
+├── app/
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/com/example/pixelwatchtagger/
+│   │   │   │   └── MainActivity.kt
+│   │   │   ├── res/
+│   │   │   │   ├── values/
+│   │   │   │   │   ├── strings.xml
+│   │   │   │   │   └── colors.xml
+│   │   │   │   └── mipmap-*/  (launcher icons)
+│   │   │   └── AndroidManifest.xml
+│   │   └── test/  (unit tests - to be added)
+│   └── build.gradle.kts
+├── gradle/
+│   └── wrapper/
+├── build.gradle.kts
+├── settings.gradle.kts
+├── gradlew
+└── gradlew.bat
+```
+
+### Key Files
+
+- **app/build.gradle.kts**: App module configuration with dependencies
+- **build.gradle.kts**: Root project configuration
+- **settings.gradle.kts**: Project settings and module inclusion
+- **AndroidManifest.xml**: Wear OS app configuration and permissions
+- **MainActivity.kt**: Main entry point with Compose UI
 
 ## Development Workflow
 
@@ -113,10 +156,21 @@ The git hook will detect these changes and either:
 - Automatically update via Claude Code (if enabled)
 - Remind you to update manually
 
-## Future Development
+## Current Development Status
 
-When implementing the Pixel Watch application:
-1. Set up Android/Wear OS project structure
-2. Configure Gradle build system with Wear OS dependencies
-3. Define app features and architecture
-4. Update this CLAUDE.md with build commands, deployment instructions, and architecture details
+### Completed
+- ✅ Basic Gradle build system with Wear OS support
+- ✅ Minimal Kotlin app with Jetpack Compose
+- ✅ Java 21 configuration
+- ✅ Project structure and AndroidManifest
+
+### Next Steps
+1. Implement Room database schema (Button and Event entities)
+2. Create circular button layout UI with dynamic positioning
+3. Implement View/Edit mode with gesture navigation
+4. Add statistics screen with scatter plot visualization
+5. Implement clustering algorithm (DBSCAN) for pattern detection
+6. Add prediction system with countdown timers
+7. Implement background workers for data cleanup and prediction updates
+
+See REQUIREMENTS.md for detailed feature specifications.
