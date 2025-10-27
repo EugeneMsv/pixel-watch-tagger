@@ -79,11 +79,27 @@ invoke_changelog_tracker() {
         return 1
     fi
 
-    if echo "/changelog-tracker" | timeout ${CLAUDE_TIMEOUT}s claude &> /dev/null; then
-        print_success "Skill execution completed"
-        return 0
+    # Use headless mode with proper skill invocation and auto-approve edits
+    local output
+    if output=$(timeout ${CLAUDE_TIMEOUT}s claude -p "/changelog-tracker" --permission-mode acceptEdits 2>&1); then
+        # Check if CHANGELOG.md was actually modified
+        if git diff --name-only | grep -q "^CHANGELOG.md$" || git diff --cached --name-only | grep -q "^CHANGELOG.md$"; then
+            # Stage CHANGELOG.md if it was modified but not staged
+            if ! is_changelog_staged; then
+                git add CHANGELOG.md
+                print_success "CHANGELOG.md updated and staged automatically"
+            else
+                print_success "CHANGELOG.md already staged"
+            fi
+            return 0
+        else
+            print_warning "Skill completed but CHANGELOG.md was not updated"
+            echo "$output"
+            return 1
+        fi
     else
         print_warning "Skill execution failed or timed out"
+        echo "$output"
         return 1
     fi
 }
@@ -98,7 +114,7 @@ print_blocked_message() {
     echo ""
     echo -e "${BLUE}Options:${NC}"
     echo "  1. Run the skill manually:"
-    echo "     ${GREEN}claude /changelog-tracker${NC}"
+    echo "     ${GREEN}claude -p \"/changelog-tracker\" --permission-mode acceptEdits${NC}"
     echo ""
     echo "  2. Enable automatic updates:"
     echo "     ${GREEN}git config --local hooks.enableClaude true${NC}"
@@ -130,11 +146,8 @@ main() {
     # Try auto-update if enabled
     if [ "$ENABLE_CLAUDE" = "true" ]; then
         if invoke_changelog_tracker; then
-            # Check again if CHANGELOG.md is now staged
-            if is_changelog_staged; then
-                print_success "Documentation automatically updated"
-                exit 0
-            fi
+            print_success "Documentation automatically updated and staged"
+            exit 0
         fi
         print_warning "Auto-update failed, falling back to manual requirement"
     fi

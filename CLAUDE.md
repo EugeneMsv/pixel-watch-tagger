@@ -17,6 +17,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Build System**: Gradle 8.9 with Kotlin DSL
 - **UI Framework**: Jetpack Compose for Wear OS
 
+### Version Management
+
+All version numbers and SDK configurations are centralized in `gradle.properties`:
+- SDK versions (compileSdk, minSdk, targetSdk)
+- Plugin versions (Android Gradle Plugin, Kotlin)
+- Dependency versions (Wear Compose, Compose UI, Activity Compose)
+- App metadata (versionCode, versionName)
+- Java/Kotlin configuration (javaVersion, jvmTargetVersion)
+
+To update versions, modify `gradle.properties` instead of individual build files.
+
 ## Development Setup
 
 ### Initial Setup
@@ -89,7 +100,8 @@ pixel-watch-tagger/
 
 ### Key Files
 
-- **app/build.gradle.kts**: App module configuration with dependencies
+- **gradle.properties**: Centralized version management for all SDK versions, plugins, and dependencies
+- **app/build.gradle.kts**: App module configuration with dependencies (reads from gradle.properties)
 - **build.gradle.kts**: Root project configuration
 - **settings.gradle.kts**: Project settings and module inclusion
 - **AndroidManifest.xml**: Wear OS app configuration and permissions
@@ -105,9 +117,10 @@ This repository uses git hooks to enforce documentation updates. A pre-commit ho
 
 **Automatic Mode** (Claude Code installed and enabled):
 1. Pre-commit hook detects changes
-2. Invokes Claude Code to update CHANGELOG.md and CLAUDE.md
-3. Stages the updated documentation
-4. Commit proceeds automatically
+2. Invokes Claude Code in headless mode with auto-approve for edits
+3. Updates CHANGELOG.md and CLAUDE.md automatically
+4. Stages the updated documentation
+5. Commit proceeds automatically
 
 **Manual Mode** (fallback):
 1. Pre-commit hook validates changes

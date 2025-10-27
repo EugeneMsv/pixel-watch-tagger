@@ -22,5 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced pre-commit hook with headless mode and auto-approve for seamless documentation updates
 - Refactored app/build.gradle.kts to use gradle.properties for version configuration, improving maintainability
 - Disabled Gradle configuration cache temporarily to resolve build issues
+- Improved pre-commit hook to properly stage CHANGELOG.md after automatic updates. Added verification to ensure documentation modifications are captured before commit proceeds.
+- Updated pre-commit hook manual invocation command to use proper headless mode flags for better user experience
 
 [Unreleased]: https://github.com/username/pixel-watch-tagger/compare/v0.1.0...HEAD
