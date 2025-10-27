@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "com.example.pixelwatchtagger"
-    compileSdk = 34
+    compileSdk = findProperty("compileSdkVersion").toString().toInt()
 
     defaultConfig {
         applicationId = "com.example.pixelwatchtagger"
-        minSdk = 33  // Wear OS 4+
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        minSdk = findProperty("minSdkVersion").toString().toInt()  // Wear OS 4+
+        targetSdk = findProperty("targetSdkVersion").toString().toInt()
+        versionCode = findProperty("appVersionCode").toString().toInt()
+        versionName = findProperty("appVersionName").toString()
     }
 
     buildTypes {
@@ -27,12 +27,13 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        val javaVer = JavaVersion.toVersion(findProperty("javaVersion").toString().toInt())
+        sourceCompatibility = javaVer
+        targetCompatibility = javaVer
     }
 
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = findProperty("jvmTargetVersion").toString()
     }
 
     buildFeatures {
@@ -41,14 +42,19 @@ android {
 }
 
 dependencies {
+    val wearComposeVersion = findProperty("wearComposeVersion").toString()
+    val composeUiVersion = findProperty("composeUiVersion").toString()
+    val activityComposeVersion = findProperty("activityComposeVersion").toString()
+    val wearVersion = findProperty("wearVersion").toString()
+
     // Wear OS Compose
-    implementation("androidx.wear.compose:compose-material:1.4.0")
-    implementation("androidx.wear.compose:compose-foundation:1.4.0")
+    implementation("androidx.wear.compose:compose-material:$wearComposeVersion")
+    implementation("androidx.wear.compose:compose-foundation:$wearComposeVersion")
 
     // Compose UI
-    implementation("androidx.compose.ui:ui:1.7.5")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.compose.ui:ui:$composeUiVersion")
+    implementation("androidx.activity:activity-compose:$activityComposeVersion")
 
     // Wear OS libraries
-    implementation("androidx.wear:wear:1.3.0")
+    implementation("androidx.wear:wear:$wearVersion")
 }

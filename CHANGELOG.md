@@ -16,5 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Gradle 8.9 build system with Kotlin DSL and Java 21 support
 - Basic Wear OS 4+ project structure with Jetpack Compose
 - Minimal launcher app displaying "Pixel Watch Tagger" text
+- Centralized version management in gradle.properties for SDK versions, dependencies, and app metadata
+
+### Changed
+- Enhanced pre-commit hook with headless mode and auto-approve for seamless documentation updates
+- Refactored app/build.gradle.kts to use gradle.properties for version configuration, improving maintainability
+- Disabled Gradle configuration cache temporarily to resolve build issues
 
 [Unreleased]: https://github.com/username/pixel-watch-tagger/compare/v0.1.0...HEAD
