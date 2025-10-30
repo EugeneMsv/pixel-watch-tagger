@@ -67,11 +67,102 @@ This configures the repository to enforce documentation updates on every commit.
 ./gradlew dependencyUpdates
 ```
 
-### Code Quality Tools
+### Code Quality and Style Guidelines
 
-The IntelliJ configuration includes:
-- **CheckStyle**: Configured with custom rules
-- **Google Java Format**: Enabled for code formatting
+This project follows strict code quality standards with automated formatting and linting. All contributors must adhere to the following guidelines:
+
+#### Style Guides
+
+Comprehensive style guides are available in the repository:
+
+- **[KOTLIN_STYLE_GUIDE.md](KOTLIN_STYLE_GUIDE.md)**: Kotlin coding conventions and best practices
+  - Naming conventions, formatting, null safety
+  - Coroutines, data classes, and modern language features
+  - Based on official Kotlin conventions and Android guidelines
+
+- **[COMPOSE_STYLE_GUIDE.md](COMPOSE_STYLE_GUIDE.md)**: Jetpack Compose best practices
+  - Composition patterns, state management, performance
+  - Wear OS-specific guidelines
+  - Testing and common patterns
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Architecture patterns and project structure
+  - MVVM architecture pattern
+  - Layer responsibilities and data flow
+  - Dependency injection with Hilt
+  - Navigation and error handling
+
+#### Automated Code Formatting with Spotless
+
+The project uses **Spotless** with **ktlint** for automated code formatting.
+
+**Key Commands:**
+
+```bash
+# Check formatting issues
+./gradlew spotlessCheck
+
+# Automatically fix formatting issues
+./gradlew spotlessApply
+
+# Run before committing
+./gradlew spotlessApply && ./gradlew build
+```
+
+**Spotless Configuration:**
+- Enforces 4-space indentation
+- 100-character line limit
+- ktlint 1.0.1 for Kotlin formatting
+- Automatic trailing whitespace removal
+- Ensures files end with newline
+
+**Integration:**
+- Spotless runs automatically in CI/CD
+- Pre-commit hooks can trigger spotlessCheck
+- Configuration in `app/build.gradle.kts`
+
+#### Lint Checks
+
+The project includes comprehensive lint checks, including Compose-specific rules:
+
+```bash
+# Run lint checks
+./gradlew lint
+
+# Generate lint report
+./gradlew lintDebug
+```
+
+**Enabled Compose Lint Checks:**
+- `ComposeUnstableCollections`: Detects unstable collections in Composables
+- `ComposableNaming`: Enforces PascalCase for Composable functions
+- `ComposeModifierMissing`: Ensures Composables accept Modifier parameters
+- `ComposeRememberMissing`: Detects missing `remember` calls
+- `ComposeParameterOrder`: Enforces correct parameter ordering
+- `ComposeViewModelInjection`: Validates ViewModel injection patterns
+
+Lint reports are generated in `app/build/reports/lint-results.html`
+
+#### EditorConfig
+
+The project includes `.editorconfig` for consistent formatting across all IDEs:
+- 4-space indentation for Kotlin, XML, and Gradle files
+- UTF-8 encoding
+- LF line endings
+- Automatic trailing whitespace trimming
+
+Most modern IDEs (Android Studio, IntelliJ IDEA, VS Code) automatically respect these settings.
+
+#### Code Review Checklist
+
+Before submitting code, ensure:
+- [ ] `./gradlew spotlessApply` has been run
+- [ ] `./gradlew build` passes without errors
+- [ ] `./gradlew lint` passes without critical issues
+- [ ] Code follows Kotlin style guide
+- [ ] Composables follow Compose best practices
+- [ ] Architecture patterns are maintained
+- [ ] Tests are added for new features
+- [ ] Documentation is updated
 
 ## Project Structure
 
