@@ -1,0 +1,77 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Kotlin files
+[*.{kt,kts}]
+indent_size = 4
+indent_style = space
+max_line_length = 100
+ij_kotlin_allow_trailing_comma = false
+ij_kotlin_allow_trailing_comma_on_call_site = false
+
+# Kotlin code style
+ij_kotlin_name_count_to_use_star_import = 99
+ij_kotlin_name_count_to_use_star_import_for_members = 99
+ij_kotlin_packages_to_use_import_on_demand = unset
+ij_kotlin_imports_layout = *,java.**,javax.**,kotlin.**,^
+
+# Kotlin spacing
+ij_kotlin_spaces_before_comma = false
+ij_kotlin_spaces_after_comma = true
+ij_kotlin_spaces_around_assignment_operators = true
+ij_kotlin_spaces_around_equality_operators = true
+ij_kotlin_spaces_around_lambda_arrow = true
+ij_kotlin_spaces_around_range = false
+ij_kotlin_spaces_around_when_arrow = true
+
+# Kotlin wrapping
+ij_kotlin_call_parameters_wrap = normal
+ij_kotlin_method_parameters_wrap = normal
+ij_kotlin_continuation_indent_in_parameter_lists = true
+ij_kotlin_continuation_indent_for_chained_calls = true
+
+# XML files (Android resources)
+[*.xml]
+indent_size = 4
+indent_style = space
+ij_xml_keep_blank_lines = 1
+ij_xml_align_attributes = false
+
+# Gradle files
+[*.gradle]
+indent_size = 4
+indent_style = space
+
+[*.gradle.kts]
+indent_size = 4
+indent_style = space
+
+# Markdown files
+[*.md]
+max_line_length = off
+trim_trailing_whitespace = false
+
+# JSON files
+[*.json]
+indent_size = 2
+indent_style = space
+
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+indent_style = space
+
+# Properties files
+[*.properties]
+end_of_line = lf
+indent_size = 4
+indent_style = space
