@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.diffplug.spotless")
+    id("jacoco")
 }
 
 android {
@@ -15,15 +16,28 @@ android {
         targetSdk = findProperty("targetSdkVersion").toString().toInt()
         versionCode = findProperty("appVersionCode").toString().toInt()
         versionName = findProperty("appVersionName").toString()
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
         }
     }
 
@@ -71,6 +85,8 @@ dependencies {
     val composeUiVersion = findProperty("composeUiVersion").toString()
     val activityComposeVersion = findProperty("activityComposeVersion").toString()
     val wearVersion = findProperty("wearVersion").toString()
+    val junitVersion = findProperty("junitVersion").toString()
+    val androidXTestVersion = findProperty("androidXTestVersion").toString()
 
     // Wear OS Compose
     implementation("androidx.wear.compose:compose-material:$wearComposeVersion")
@@ -82,6 +98,16 @@ dependencies {
 
     // Wear OS libraries
     implementation("androidx.wear:wear:$wearVersion")
+
+    // Testing dependencies
+    testImplementation("junit:junit:$junitVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+
+    // Android testing
+    androidTestImplementation("androidx.test.ext:junit:$androidXTestVersion")
+    androidTestImplementation("androidx.test:runner:$androidXTestVersion")
+    androidTestImplementation("androidx.test:rules:$androidXTestVersion")
 }
 
 spotless {
@@ -124,4 +150,90 @@ spotless {
         trimTrailingWhitespace()
         endWithNewline()
     }
+}
+
+// JaCoCo configuration
+jacoco {
+    toolVersion = findProperty("jacocoVersion").toString()
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(true)
+    }
+
+    val fileFilter = listOf(
+        "**/R.class",
+        "**/R$*.class",
+        "**/BuildConfig.*",
+        "**/Manifest*.*",
+        "**/*Test*.*",
+        "android/**/*.*",
+        "**/*\$ViewInjector*.*",
+        "**/*\$ViewBinder*.*",
+        "**/Lambda$*.class",
+        "**/Lambda.class",
+        "**/*Lambda.class",
+        "**/*Lambda*.class",
+        "**/*_MembersInjector.class",
+        "**/Dagger*Component*.*",
+        "**/*Module_*Factory.class",
+        "**/di/module/*",
+        "**/*_Factory*.*",
+        "**/*Module*.*",
+        "**/*Dagger*.*",
+        "**/*Hilt*.*"
+    )
+
+    val debugTree = fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+        exclude(fileFilter)
+    }
+
+    val mainSrc = "${project.projectDir}/src/main/java"
+
+    sourceDirectories.setFrom(files(mainSrc))
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
+        include("**/*.exec", "**/*.ec")
+    })
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn("jacocoTestReport")
+
+    val minimumCoverage = findProperty("minimumCoverageRequired").toString().toBigDecimal()
+
+    violationRules {
+        rule {
+            limit {
+                minimum = minimumCoverage
+            }
+        }
+    }
+
+    val fileFilter = listOf(
+        "**/R.class",
+        "**/R$*.class",
+        "**/BuildConfig.*",
+        "**/Manifest*.*",
+        "**/*Test*.*",
+        "android/**/*.*"
+    )
+
+    val debugTree = fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+        exclude(fileFilter)
+    }
+
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
+        include("**/*.exec", "**/*.ec")
+    })
+}
+
+tasks.named("check") {
+    dependsOn("jacocoTestCoverageVerification")
 }

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic Wear OS 4+ project structure with Jetpack Compose
 - Minimal launcher app displaying "Pixel Watch Tagger" text
 - Centralized version management in gradle.properties for SDK versions, dependencies, and app metadata
+- Mandatory unit test coverage requirement with 60% minimum threshold enforced by pre-commit hook. JaCoCo integration provides automated test coverage reporting and verification for all source code changes.
 
 ### Changed
 - Enhanced pre-commit hook with headless mode and auto-approve for seamless documentation updates
