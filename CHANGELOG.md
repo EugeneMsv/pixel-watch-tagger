@@ -27,5 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated pre-commit hook manual invocation command to use proper headless mode flags for better user experience
 - Completely rewrote all style guides (KOTLIN_STYLE_GUIDE.md, COMPOSE_STYLE_GUIDE.md, ARCHITECTURE.md) to use text-based rule descriptions instead of code examples, making them more concise and easier to maintain while preserving all guidance
 - Integrated spotlessApply into pre-commit hook to automatically format code before changelog validation, ensuring consistent code style with automatic staging of formatted files
+- Simplified coverage check script to run gradle task and extract overall coverage percentage, reducing code complexity from 246 to 84 lines
 
 [Unreleased]: https://github.com/username/pixel-watch-tagger/compare/v0.1.0...HEAD
