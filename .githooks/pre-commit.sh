@@ -129,7 +129,20 @@ print_blocked_message() {
 #──────────────────────────────────────────────────────────────────────────────
 
 main() {
-    print_info "🔍 Checking documentation requirements..."
+    print_info "🔍 Running pre-commit checks..."
+
+    # First, check test coverage requirements
+    print_info "📊 Step 1: Test Coverage Verification"
+    if [[ -x "$(git rev-parse --show-toplevel)/.githooks/check-coverage.sh" ]]; then
+        if ! "$(git rev-parse --show-toplevel)/.githooks/check-coverage.sh"; then
+            exit 1
+        fi
+    else
+        print_warning "Coverage check script not found or not executable"
+    fi
+
+    echo ""
+    print_info "📝 Step 2: Documentation Requirements"
 
     # No substantive changes? Allow commit
     if ! has_substantive_changes; then

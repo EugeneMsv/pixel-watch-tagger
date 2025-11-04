@@ -61,6 +61,18 @@ This configures the repository to enforce documentation updates on every commit.
 # Build the project
 ./gradlew build
 
+# Run unit tests
+./gradlew testDebugUnitTest
+
+# Run tests with coverage report
+./gradlew testDebugUnitTest jacocoTestReport
+
+# Check coverage meets minimum threshold
+./gradlew jacocoTestCoverageVerification
+
+# Run full check (includes tests, coverage, lint)
+./gradlew check
+
 # Install debug APK to connected watch
 ./gradlew installDebug
 
@@ -145,16 +157,69 @@ The project includes `.editorconfig` for consistent formatting across all IDEs:
 
 Most modern IDEs (Android Studio, IntelliJ IDEA, VS Code) automatically respect these settings.
 
+#### Unit Test Coverage Requirements
+
+**MANDATORY**: All source code changes MUST include unit tests with minimum 60% code coverage.
+
+This requirement is enforced automatically by the pre-commit hook.
+
+**Key Requirements:**
+- Every source file must have a corresponding test file
+- Test file naming: `FooBar.kt` → `FooBarTest.kt`
+- Test location: `app/src/main/java/...` → `app/src/test/java/...`
+- Minimum coverage: 60% line coverage per changed file
+
+**Coverage Commands:**
+
+```bash
+# Run tests with coverage report
+./gradlew testDebugUnitTest jacocoTestReport
+
+# View coverage report
+open app/build/reports/jacoco/jacocoTestReport/html/index.html
+
+# Verify coverage meets minimum threshold
+./gradlew jacocoTestCoverageVerification
+
+# Run full check including coverage
+./gradlew check
+```
+
+**Coverage Configuration:**
+- Tool: JaCoCo 0.8.12
+- Reports: XML, HTML, and CSV formats
+- Excludes: Generated code, Android framework classes, test files
+- Configuration: `app/build.gradle.kts` and `gradle.properties`
+- Minimum threshold: Configurable via `minimumCoverageRequired` property
+
+**Pre-commit Hook Behavior:**
+
+The pre-commit hook automatically:
+1. Detects changed source files
+2. Verifies each has a corresponding test file
+3. Runs all tests
+4. Checks coverage for changed files
+5. Blocks commit if coverage < 60%
+
+**Emergency Bypass:**
+
+Only use when absolutely necessary:
+```bash
+git commit --no-verify
+```
+
 #### Code Review Checklist
 
 Before submitting code, ensure:
 - [ ] `./gradlew spotlessApply` has been run
+- [ ] Unit tests added for all source code changes
+- [ ] `./gradlew testDebugUnitTest` passes without errors
+- [ ] Test coverage meets 60% minimum requirement
 - [ ] `./gradlew build` passes without errors
 - [ ] `./gradlew lint` passes without critical issues
 - [ ] Code follows Kotlin style guide
 - [ ] Composables follow Compose best practices
 - [ ] Architecture patterns are maintained
-- [ ] Tests are added for new features
 - [ ] Documentation is updated
 
 ## Project Structure
