@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.diffplug.spotless")
 }
 
 android {
@@ -39,6 +40,30 @@ android {
     buildFeatures {
         compose = true
     }
+
+    lint {
+        // Enable Compose-specific lint checks
+        enable += setOf(
+            "ComposeUnstableCollections",
+            "ComposableNaming",
+            "ComposeModifierMissing",
+            "ComposeModifierReused",
+            "ComposeRememberMissing",
+            "CompositionLocalNaming",
+            "ComposeParameterOrder",
+            "ComposeViewModelInjection"
+        )
+
+        // Fail build on errors
+        abortOnError = true
+
+        // Generate reports
+        htmlReport = true
+        xmlReport = true
+
+        // Baseline for existing issues
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 dependencies {
@@ -57,4 +82,46 @@ dependencies {
 
     // Wear OS libraries
     implementation("androidx.wear:wear:$wearVersion")
+}
+
+spotless {
+    kotlin {
+        target("src/**/*.kt")
+        targetExclude("**/build/**/*.kt")
+
+        // Use ktlint for Kotlin formatting
+        ktlint("1.0.1")
+            .editorConfigOverride(
+                mapOf(
+                    "indent_size" to "4",
+                    "indent_style" to "space",
+                    "max_line_length" to "100",
+                    "ktlint_standard_no-wildcard-imports" to "disabled",
+                    "ktlint_standard_trailing-comma-on-call-site" to "disabled",
+                    "ktlint_standard_trailing-comma-on-declaration-site" to "disabled"
+                )
+            )
+
+        // License header (optional)
+        // licenseHeaderFile(rootProject.file("spotless/copyright.txt"))
+
+        // Trim trailing whitespace
+        trimTrailingWhitespace()
+
+        // End files with newline
+        endWithNewline()
+    }
+
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint("1.0.1")
+    }
+
+    format("xml") {
+        target("src/**/*.xml")
+        targetExclude("**/build/**/*.xml")
+        indentWithSpaces(4)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
