@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+# NON Escaping rules
+- None of the document must have the real code examples or snippets or real code examples from repository. Rules must described by words not by examples
+- Always prefer a concise wording to make thing simple
+
 ## Project Overview
 
 **pixel-watch-tagger** is a Kotlin application designed for Google Pixel Watch. The app tracks timestamped button presses across configurable categories and uses clustering algorithms to analyze patterns and predict future occurrences.
@@ -75,21 +79,10 @@ This project follows strict code quality standards with automated formatting and
 
 Comprehensive style guides are available in the repository:
 
-- **[KOTLIN_STYLE_GUIDE.md](KOTLIN_STYLE_GUIDE.md)**: Kotlin coding conventions and best practices
+- **[STYLE_GUIDE.md](STYLE_GUIDE.md)**: Project coding conventions and best practices
   - Naming conventions, formatting, null safety
   - Coroutines, data classes, and modern language features
   - Based on official Kotlin conventions and Android guidelines
-
-- **[COMPOSE_STYLE_GUIDE.md](COMPOSE_STYLE_GUIDE.md)**: Jetpack Compose best practices
-  - Composition patterns, state management, performance
-  - Wear OS-specific guidelines
-  - Testing and common patterns
-
-- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Architecture patterns and project structure
-  - MVVM architecture pattern
-  - Layer responsibilities and data flow
-  - Dependency injection with Hilt
-  - Navigation and error handling
 
 #### Automated Code Formatting with Spotless
 
