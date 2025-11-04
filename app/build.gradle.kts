@@ -237,3 +237,28 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
 tasks.named("check") {
     dependsOn("jacocoTestCoverageVerification")
 }
+
+// Custom task: styleCheck - runs code formatting and linting
+tasks.register("styleCheck") {
+    description = "Runs code formatting and linting checks"
+    group = "verification"
+
+    dependsOn("spotlessApply", "lint")
+
+    doLast {
+        println("✓ Code style check completed")
+    }
+}
+
+// Custom task: test - runs all tests with coverage
+tasks.register("test") {
+    description = "Runs unit tests and generates coverage report"
+    group = "verification"
+
+    dependsOn("testDebugUnitTest", "jacocoTestReport")
+
+    doLast {
+        println("✓ Tests completed with coverage report")
+        println("View coverage: app/build/reports/jacoco/jacocoTestReport/html/index.html")
+    }
+}

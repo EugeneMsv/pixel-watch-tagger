@@ -57,20 +57,23 @@ This configures the repository to enforce documentation updates on every commit.
 
 ### Build Commands
 
+**Main Commands:**
+
+```bash
+# Style check - runs code formatting and linting
+./gradlew styleCheck
+
+# Test - runs unit tests with coverage report
+./gradlew test
+```
+
+**Additional Commands:**
+
 ```bash
 # Build the project
 ./gradlew build
 
-# Run unit tests
-./gradlew testDebugUnitTest
-
-# Run tests with coverage report
-./gradlew testDebugUnitTest jacocoTestReport
-
-# Check coverage meets minimum threshold
-./gradlew jacocoTestCoverageVerification
-
-# Run full check (includes tests, coverage, lint)
+# Run full check (includes tests, coverage verification, lint)
 ./gradlew check
 
 # Install debug APK to connected watch
@@ -103,14 +106,11 @@ The project uses **Spotless** with **ktlint** for automated code formatting.
 **Key Commands:**
 
 ```bash
-# Check formatting issues
-./gradlew spotlessCheck
+# Run style check (formatting + linting)
+./gradlew styleCheck
 
-# Automatically fix formatting issues
+# Or run formatting only
 ./gradlew spotlessApply
-
-# Run before committing
-./gradlew spotlessApply && ./gradlew build
 ```
 
 **Spotless Configuration:**
@@ -173,15 +173,12 @@ This requirement is enforced automatically by the pre-commit hook.
 
 ```bash
 # Run tests with coverage report
-./gradlew testDebugUnitTest jacocoTestReport
+./gradlew test
 
 # View coverage report
 open app/build/reports/jacoco/jacocoTestReport/html/index.html
 
-# Verify coverage meets minimum threshold
-./gradlew jacocoTestCoverageVerification
-
-# Run full check including coverage
+# Run full check including coverage verification
 ./gradlew check
 ```
 
@@ -211,12 +208,11 @@ git commit --no-verify
 #### Code Review Checklist
 
 Before submitting code, ensure:
-- [ ] `./gradlew spotlessApply` has been run
+- [ ] `./gradlew styleCheck` has been run (formatting and linting)
 - [ ] Unit tests added for all source code changes
-- [ ] `./gradlew testDebugUnitTest` passes without errors
+- [ ] `./gradlew test` passes without errors (tests and coverage)
 - [ ] Test coverage meets 60% minimum requirement
 - [ ] `./gradlew build` passes without errors
-- [ ] `./gradlew lint` passes without critical issues
 - [ ] Code follows Kotlin style guide
 - [ ] Composables follow Compose best practices
 - [ ] Architecture patterns are maintained

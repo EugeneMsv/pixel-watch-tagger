@@ -38,9 +38,9 @@ main() {
 
     # Run tests and generate coverage
     cd "$PROJECT_DIR"
-    print_info "📊 Running: ./gradlew testDebugUnitTest jacocoTestReport"
+    print_info "📊 Running: ./gradlew test"
 
-    if ! ./gradlew testDebugUnitTest jacocoTestReport --quiet; then
+    if ! ./gradlew test --quiet; then
         print_error "Tests failed - fix failing tests before committing"
         exit 1
     fi
