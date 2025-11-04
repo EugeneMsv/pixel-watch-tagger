@@ -45,6 +45,37 @@ print_info() {
 # CORE LOGIC
 #──────────────────────────────────────────────────────────────────────────────
 
+run_spotless_apply() {
+    print_info "🎨 Running spotless code formatter..."
+
+    # Check if gradlew exists
+    if [ ! -f "./gradlew" ]; then
+        print_warning "Gradle wrapper not found, skipping spotless"
+        return 0
+    fi
+
+    # Run spotlessApply
+    if ./gradlew spotlessApply --quiet 2>&1; then
+        # Check if there are any unstaged changes after spotlessApply
+        if [ -n "$(git diff --name-only)" ]; then
+            print_info "Spotless made formatting changes, staging them..."
+            # Stage all modified files that were already staged or modified
+            git diff --name-only | while IFS= read -r file; do
+                if [ -f "$file" ]; then
+                    git add "$file"
+                fi
+            done
+            print_success "Formatted files staged automatically"
+        else
+            print_success "Code already formatted correctly"
+        fi
+        return 0
+    else
+        print_error "Spotless formatting failed"
+        return 1
+    fi
+}
+
 is_excluded() {
     local file=$1
     for pattern in "${EXCLUDED_PATTERNS[@]}"; do
@@ -129,6 +160,12 @@ print_blocked_message() {
 #──────────────────────────────────────────────────────────────────────────────
 
 main() {
+    # Run spotless formatting first
+    if ! run_spotless_apply; then
+        print_error "Spotless formatting failed, commit aborted"
+        exit 1
+    fi
+
     print_info "🔍 Checking documentation requirements..."
 
     # No substantive changes? Allow commit
