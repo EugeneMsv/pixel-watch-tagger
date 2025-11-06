@@ -161,12 +161,27 @@ print_blocked_message() {
 
 main() {
     # Run spotless formatting first
+    print_info "🔍 Running pre-commit checks..."
+    print_info "📊 Step 1: Spotless auto code formatting"
     if ! run_spotless_apply; then
         print_error "Spotless formatting failed, commit aborted"
         exit 1
     fi
 
-    print_info "🔍 Checking documentation requirements..."
+
+
+    # First, check test coverage requirements
+    print_info "📊 Step 2: Test Coverage Verification"
+    if [[ -x "$(git rev-parse --show-toplevel)/.githooks/check-coverage.sh" ]]; then
+        if ! "$(git rev-parse --show-toplevel)/.githooks/check-coverage.sh"; then
+            exit 1
+        fi
+    else
+        print_warning "Coverage check script not found or not executable"
+    fi
+
+    echo ""
+    print_info "📝 Step 3: Documentation Requirements"
 
     # No substantive changes? Allow commit
     if ! has_substantive_changes; then
