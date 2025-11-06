@@ -36,5 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streamlined Compose lint checks to only ComposableNaming and CompositionLocalNaming. Removed lint baseline configuration to start fresh.
 - Removed unused color resources from colors.xml. Removed allowBackup attribute from AndroidManifest and simplified activity configuration.
 - Disabled ktlint function naming rule to allow flexibility in Composable and test function naming conventions
+- Added test comment to app/build.gradle.kts to verify changelog tracker behavior
 
 [Unreleased]: https://github.com/username/pixel-watch-tagger/compare/v0.1.0...HEAD
