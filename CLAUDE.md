@@ -63,8 +63,24 @@ This configures the repository to enforce documentation updates on every commit.
 # Style check - runs code formatting and linting
 ./gradlew styleCheck
 
-# Test - runs unit tests with coverage report
-./gradlew test
+# Unit tests - runs unit tests across all variants
+./gradlew testUnit
+
+# Unit tests with coverage - includes coverage report and verification
+./gradlew testWithCoverage
+```
+
+**Test Commands:**
+
+```bash
+# Instrumented tests - runs on connected device/emulator
+./gradlew androidTest
+
+# All tests - runs unit and instrumented tests with coverage
+./gradlew testAll
+
+# View coverage report
+open app/build/reports/jacoco/jacocoTestReport/html/index.html
 ```
 
 **Additional Commands:**
@@ -138,12 +154,8 @@ The project includes comprehensive lint checks, including Compose-specific rules
 ```
 
 **Enabled Compose Lint Checks:**
-- `ComposeUnstableCollections`: Detects unstable collections in Composables
 - `ComposableNaming`: Enforces PascalCase for Composable functions
-- `ComposeModifierMissing`: Ensures Composables accept Modifier parameters
-- `ComposeRememberMissing`: Detects missing `remember` calls
-- `ComposeParameterOrder`: Enforces correct parameter ordering
-- `ComposeViewModelInjection`: Validates ViewModel injection patterns
+- `CompositionLocalNaming`: Validates naming conventions for CompositionLocal properties
 
 Lint reports are generated in `app/build/reports/lint-results.html`
 
@@ -167,13 +179,21 @@ This requirement is enforced automatically by the pre-commit hook.
 - Every source file must have a corresponding test file
 - Test file naming: `FooBar.kt` → `FooBarTest.kt`
 - Test location: `app/src/main/java/...` → `app/src/test/java/...`
+- Test framework: JUnit 5 (Jupiter) with Kotlin test extensions
 - Minimum coverage: 60% line coverage per changed file
+
+**Test Types:**
+- **Unit Tests** (`app/src/test/`): Fast, local JVM tests using JUnit 5
+- **Instrumented Tests** (`app/src/androidTest/`): On-device tests with Compose Testing framework
 
 **Coverage Commands:**
 
 ```bash
-# Run tests with coverage report
-./gradlew test
+# Run unit tests with coverage report
+./gradlew testUnit
+
+# Run tests with coverage verification
+./gradlew testWithCoverage
 
 # View coverage report
 open app/build/reports/jacoco/jacocoTestReport/html/index.html
@@ -184,6 +204,7 @@ open app/build/reports/jacoco/jacocoTestReport/html/index.html
 
 **Coverage Configuration:**
 - Tool: JaCoCo 0.8.12
+- Test Framework: JUnit 5 (5.11.3)
 - Reports: XML, HTML, and CSV formats
 - Excludes: Generated code, Android framework classes, test files
 - Configuration: `app/build.gradle.kts` and `gradle.properties`
@@ -209,9 +230,10 @@ git commit --no-verify
 
 Before submitting code, ensure:
 - [ ] `./gradlew styleCheck` has been run (formatting and linting)
-- [ ] Unit tests added for all source code changes
-- [ ] `./gradlew test` passes without errors (tests and coverage)
+- [ ] Unit tests added for all source code changes (JUnit 5 format)
+- [ ] `./gradlew testWithCoverage` passes without errors
 - [ ] Test coverage meets 60% minimum requirement
+- [ ] Instrumented tests added for UI changes (if applicable)
 - [ ] `./gradlew build` passes without errors
 - [ ] Code follows Kotlin style guide
 - [ ] Composables follow Compose best practices
@@ -233,7 +255,12 @@ pixel-watch-tagger/
 │   │   │   │   │   └── colors.xml
 │   │   │   │   └── mipmap-*/  (launcher icons)
 │   │   │   └── AndroidManifest.xml
-│   │   └── test/  (unit tests - to be added)
+│   │   ├── test/  (unit tests - JUnit 5)
+│   │   │   └── java/com/example/pixelwatchtagger/
+│   │   │       └── MainActivityTest.kt
+│   │   └── androidTest/  (instrumented tests)
+│   │       └── java/com/example/pixelwatchtagger/
+│   │           └── MainActivityInstrumentedTest.kt
 │   └── build.gradle.kts
 ├── gradle/
 │   └── wrapper/

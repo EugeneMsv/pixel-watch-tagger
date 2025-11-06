@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Centralized version management in gradle.properties for SDK versions, dependencies, and app metadata
 - Mandatory unit test coverage requirement with 60% minimum threshold enforced by pre-commit hook. JaCoCo integration provides automated test coverage reporting and verification for all source code changes.
 - Simplified Gradle tasks: styleCheck (formatting + linting) and test (unit tests + coverage), reducing common workflows to two main commands
+- Unit tests for MainActivity verifying class structure and package name. Added MainActivityTest with JUnit 5 providing basic smoke tests for main activity functionality.
+- Instrumented UI tests for MainActivity using Compose Testing framework. Tests verify app title and subtitle display correctly on device.
+- Enhanced Gradle test tasks: testUnit (all variants), androidTest (instrumented), testWithCoverage (with verification), and testAll (comprehensive). Provides granular control over test execution.
 
 ### Changed
 - Enhanced pre-commit hook with headless mode and auto-approve for seamless documentation updates
@@ -29,5 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Completely rewrote all style guides (KOTLIN_STYLE_GUIDE.md, COMPOSE_STYLE_GUIDE.md, ARCHITECTURE.md) to use text-based rule descriptions instead of code examples, making them more concise and easier to maintain while preserving all guidance
 - Integrated spotlessApply into pre-commit hook to automatically format code before changelog validation, ensuring consistent code style with automatic staging of formatted files
 - Simplified coverage check script to run gradle task and extract overall coverage percentage, reducing code complexity from 246 to 84 lines
+- Migrated test framework from JUnit 4 to JUnit 5 (version 5.11.3) for improved test capabilities and modern testing features. Updated kotlin-test dependency to junit5 variant.
+- Streamlined Compose lint checks to only ComposableNaming and CompositionLocalNaming. Removed lint baseline configuration to start fresh.
+- Removed unused color resources from colors.xml. Removed allowBackup attribute from AndroidManifest and simplified activity configuration.
+- Disabled ktlint function naming rule to allow flexibility in Composable and test function naming conventions
 
 [Unreleased]: https://github.com/username/pixel-watch-tagger/compare/v0.1.0...HEAD
